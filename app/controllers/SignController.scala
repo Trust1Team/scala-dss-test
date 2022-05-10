@@ -1,6 +1,5 @@
 package controllers
 
-import akka.stream.scaladsl.Source
 import eu.europa.esig.dss.enumerations.DigestAlgorithm
 import models.{DataToSign, GetDataToSign, Sign}
 import play.api.libs.json.Json
@@ -8,6 +7,7 @@ import play.api.mvc._
 import services.SigningService
 
 import javax.inject._
+import scala.util.{Failure, Success}
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -16,17 +16,28 @@ import javax.inject._
 @Singleton
 class SignController @Inject()(cc: ControllerComponents, signService: SigningService) extends AbstractController(cc) {
 
+  def healthz: Action[AnyContent] = Action { Ok }
+
   def getDataToSign: Action[GetDataToSign] = Action(parse.json[GetDataToSign]) { req =>
-    Ok(Json.toJson(DataToSign(signService.getDataToSign(docPath = req.body.docPath, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo)))))
+    signService.getDataToSign(docPath = req.body.docPath, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo)) match {
+      case Failure(ex) => throw ex
+      case Success(dataToSign) => Ok(Json.toJson(DataToSign(dataToSign)))
+    }
+
   }
 
-  def getHashedDataToSign: Action[GetDataToSign] = Action(parse.json[GetDataToSign]) { req =>
-    Ok(Json.toJson(DataToSign(signService.getHashedDataToSign(docPath = req.body.docPath, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo)))))
+  def getDataToSignDigest: Action[GetDataToSign] = Action(parse.json[GetDataToSign]) { req =>
+    signService.getDataToSignDigest(docPath = req.body.docPath, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo)) match {
+      case Failure(ex) => throw ex
+      case Success(dataToSign) => Ok(Json.toJson(DataToSign(dataToSign)))
+    }
   }
 
   def sign: Action[Sign] = Action(parse.json[Sign]) { req =>
-    val bytes = signService.sign(docPath = req.body.docPath, outputPath = req.body.outputPath, signatureBytes = req.body.signatureBytes, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo))
-    Ok.streamed(content = Source.single(bytes), Some(bytes.size), None)
+    signService.sign(outputPath = req.body.outputPath, signatureBytes = req.body.signatureBytes) match {
+      case Failure(ex) => throw ex
+      case Success(outputPath) => Ok(outputPath)
+    }
   }
 
 }

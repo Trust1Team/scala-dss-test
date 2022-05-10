@@ -3,7 +3,7 @@
 # https://www.playframework.com/documentation/latest/ScalaRouting
 # ~~~~
 
-
+GET     /                           controllers.SignController.healthz
 POST    /data-to-sign               controllers.SignController.getDataToSign
-POST    /data-to-sign/hashed        controllers.SignController.getHashedDataToSign
+POST    /data-to-sign/digest        controllers.SignController.getDataToSignDigest
 POST    /sign                       controllers.SignController.sign

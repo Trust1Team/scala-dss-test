@@ -7,7 +7,7 @@ object GetDataToSign {
   implicit val fmt: Format[GetDataToSign] = Json.format
 }
 
-case class Sign(signatureBytes: String, outputPath: Option[String])
+case class Sign(signatureBytes: String, outputPath: String)
 object Sign {
   implicit val fmt: Format[Sign] = Json.format
 }
