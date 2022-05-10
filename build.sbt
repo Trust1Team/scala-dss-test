@@ -1,6 +1,6 @@
 name := """scala-dss-test"""
 organization := "com.trust1team"
-version := "1.0-SNAPSHOT"
+version := "0.0.1-SNAPSHOT"
 scalaVersion := "2.13.8"
 
 lazy val dssVersion                       = "5.10.1"
