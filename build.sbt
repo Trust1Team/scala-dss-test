@@ -30,6 +30,7 @@ lazy val root = (project in file(".")).enablePlugins(PlayScala)
   .settings(
     libraryDependencies ++= Seq(
       guice,
+      caffeine,
       dssPades,
       dssXades,
       dssCades,
