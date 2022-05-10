@@ -1,11 +1,6 @@
-
-name := """signing-test"""
+name := """scala-dss-test"""
 organization := "com.trust1team"
-
 version := "1.0-SNAPSHOT"
-
-
-
 scalaVersion := "2.13.8"
 
 lazy val dssVersion                       = "5.10.1"
@@ -34,7 +29,6 @@ resolvers ++= Seq(
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
   .settings(
     libraryDependencies ++= Seq(
-
       guice,
       dssPades,
       dssXades,
@@ -50,11 +44,3 @@ lazy val root = (project in file(".")).enablePlugins(PlayScala)
       commonsCodec
     )
   )
-
-
-
-// Adds additional packages into Twirl
-//TwirlKeys.templateImports += "com.trust1team.controllers._"
-
-// Adds additional packages into conf/routes
-// play.sbt.routes.RoutesKeys.routesImport += "com.trust1team.binders._"
