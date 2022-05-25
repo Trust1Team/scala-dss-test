@@ -2,7 +2,7 @@ package models
 
 import play.api.libs.json.{Format, Json}
 
-case class GetDataToSign(docPath: String, certChain: Seq[String], digestAlgo: String)
+case class GetDataToSign(docPath: String, certChain: Seq[String], digestAlgo: String, encryptionAlgo: String)
 object GetDataToSign {
   implicit val fmt: Format[GetDataToSign] = Json.format
 }

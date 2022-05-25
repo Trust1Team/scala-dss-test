@@ -3,7 +3,7 @@ package services
 import akka.Done
 import com.google.inject.ImplementedBy
 import eu.europa.esig.dss.alert.{LogOnStatusAlert, StatusAlert}
-import eu.europa.esig.dss.enumerations.{DigestAlgorithm, SignatureLevel, SignaturePackaging}
+import eu.europa.esig.dss.enumerations.{DigestAlgorithm, EncryptionAlgorithm, SignatureAlgorithm, SignatureLevel, SignaturePackaging}
 import eu.europa.esig.dss.model.{InMemoryDocument, SignatureValue}
 import eu.europa.esig.dss.pades.signature.PAdESService
 import eu.europa.esig.dss.pades.{PAdESSignatureParameters, PAdESTimestampParameters}
@@ -25,7 +25,6 @@ import org.apache.commons.io.IOUtils
 import org.slf4j.event.Level
 import play.api.cache.{NamedCache, SyncCacheApi}
 import play.api.{Configuration, Logging}
-import utils.PKIUtil
 
 import java.io.ByteArrayInputStream
 import java.nio.file.{Files, Paths}
@@ -38,8 +37,8 @@ import scala.util.{Failure, Success, Try}
 trait SigningService {
 
 
-  def getDataToSign(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm): Try[String]
-  def getDataToSignDigest(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm): Try[String]
+  def getDataToSign(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm, encryptionAlgorithm: EncryptionAlgorithm): Try[String]
+  def getDataToSignDigest(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm, encryptionAlgorithm: EncryptionAlgorithm): Try[String]
   def sign(signatureBytes: String, outputPath: String): Try[String]
 
   /**
@@ -159,13 +158,13 @@ final class DSSService @Inject()(config: Configuration, @NamedCache("doc-cache")
   }
 
 
-  override def getDataToSign(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm): Try[String] = {
-    pAdESDataToSign(document = new InMemoryDocument(Files.readAllBytes(Paths.get(docPath))), certChain = certificateChain,  digestAlgorithm = digestAlgorithm).map(Base64.getEncoder.encodeToString)
+  override def getDataToSign(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm, encryptionAlgorithm: EncryptionAlgorithm): Try[String] = {
+    pAdESDataToSign(document = new InMemoryDocument(Files.readAllBytes(Paths.get(docPath))), certChain = certificateChain,  digestAlgorithm = digestAlgorithm, encryptionAlgorithm = encryptionAlgorithm).map(Base64.getEncoder.encodeToString)
   }
 
-  override def getDataToSignDigest(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm): Try[String] = {
+  override def getDataToSignDigest(docPath: String, certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm, encryptionAlgorithm: EncryptionAlgorithm): Try[String] = {
     for {
-      dataToSign        <- pAdESDataToSign(document = new InMemoryDocument(Files.readAllBytes(Paths.get(docPath))), certChain = certificateChain,  digestAlgorithm = digestAlgorithm)
+      dataToSign        <- pAdESDataToSign(document = new InMemoryDocument(Files.readAllBytes(Paths.get(docPath))), certChain = certificateChain,  digestAlgorithm = digestAlgorithm, encryptionAlgorithm = encryptionAlgorithm)
       dataToSignDigest  <- Try(DSSUtils.digest(digestAlgorithm, dataToSign))
     } yield Base64.getEncoder.encodeToString(dataToSignDigest)
   }
@@ -187,8 +186,8 @@ final class DSSService @Inject()(config: Configuration, @NamedCache("doc-cache")
     }
   }
 
-  private def pAdESDataToSign(document: InMemoryDocument, certChain: Seq[String], digestAlgorithm: DigestAlgorithm): Try[Array[Byte]] = Try {
-    val signatureParams = getPadesSignatureParams(certChain, digestAlgorithm)
+  private def pAdESDataToSign(document: InMemoryDocument, certChain: Seq[String], digestAlgorithm: DigestAlgorithm, encryptionAlgorithm: EncryptionAlgorithm): Try[Array[Byte]] = Try {
+    val signatureParams = getPadesSignatureParams(certificateChain = certChain, digestAlgorithm = digestAlgorithm, encryptionAlgorithm = encryptionAlgorithm)
     logger.debug(s"DSS - creating data to sign from document")
     docCache.set("doc", document)
     docCache.set("params", signatureParams)
@@ -200,7 +199,7 @@ final class DSSService @Inject()(config: Configuration, @NamedCache("doc-cache")
       sigParams <- docCache.get[PAdESSignatureParameters](key = "params")
       document  <- docCache.get[InMemoryDocument](key = "doc")
     } yield {
-      val signedDocument = padesService.signDocument(document, sigParams, new SignatureValue(PKIUtil.getDssSignatureAlgorithm(sigParams.getDigestAlgorithm), signatureBytes))
+      val signedDocument = padesService.signDocument(document, sigParams, new SignatureValue(SignatureAlgorithm.getAlgorithm(sigParams.getEncryptionAlgorithm, sigParams.getDigestAlgorithm), signatureBytes))
       val signedBytes = IOUtils.toByteArray(signedDocument.openStream())
       Files.write(Paths.get(outputPath), signedBytes)
       docCache.remove("doc")
@@ -212,7 +211,7 @@ final class DSSService @Inject()(config: Configuration, @NamedCache("doc-cache")
     }
   }
 
-  private def getPadesSignatureParams(certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm): PAdESSignatureParameters = {
+  private def getPadesSignatureParams(certificateChain: Seq[String], digestAlgorithm: DigestAlgorithm, encryptionAlgorithm: EncryptionAlgorithm): PAdESSignatureParameters = {
     //certificateChain.foreach(cert => logger.debug(cert))
     val params = new PAdESSignatureParameters
     val signatureLevel = SignatureLevel.PAdES_BASELINE_B
@@ -222,6 +221,7 @@ final class DSSService @Inject()(config: Configuration, @NamedCache("doc-cache")
     params.setReason("This is a test")
     params.setSignaturePackaging(SignaturePackaging.DETACHED)
     params.setSignWithExpiredCertificate(true)
+    params.setEncryptionAlgorithm(encryptionAlgorithm)
     params.setDigestAlgorithm(digestAlgorithm)
     params.bLevel().setSigningDate(new Date())
     params.setSigningCertificate(DSSUtils.loadCertificateFromBase64EncodedString(certificateChain.head))

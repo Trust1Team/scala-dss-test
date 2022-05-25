@@ -1,13 +1,13 @@
 package controllers
 
-import eu.europa.esig.dss.enumerations.DigestAlgorithm
+import eu.europa.esig.dss.enumerations.{DigestAlgorithm, EncryptionAlgorithm}
 import models.{DataToSign, GetDataToSign, Sign}
 import play.api.libs.json.Json
 import play.api.mvc._
 import services.SigningService
 
 import javax.inject._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -19,7 +19,12 @@ class SignController @Inject()(cc: ControllerComponents, signService: SigningSer
   def healthz: Action[AnyContent] = Action { Ok }
 
   def getDataToSign: Action[GetDataToSign] = Action(parse.json[GetDataToSign]) { req =>
-    signService.getDataToSign(docPath = req.body.docPath, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo)) match {
+    signService.getDataToSign(
+      docPath = req.body.docPath,
+      certificateChain = req.body.certChain,
+      digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo),
+      encryptionAlgorithm = Try(EncryptionAlgorithm.forName(req.body.encryptionAlgo)).getOrElse(EncryptionAlgorithm.RSA)
+    ) match {
       case Failure(ex) => throw ex
       case Success(dataToSign) => Ok(Json.toJson(DataToSign(dataToSign)))
     }
@@ -27,7 +32,12 @@ class SignController @Inject()(cc: ControllerComponents, signService: SigningSer
   }
 
   def getDataToSignDigest: Action[GetDataToSign] = Action(parse.json[GetDataToSign]) { req =>
-    signService.getDataToSignDigest(docPath = req.body.docPath, certificateChain = req.body.certChain, digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo)) match {
+    signService.getDataToSignDigest(
+      docPath = req.body.docPath,
+      certificateChain = req.body.certChain,
+      digestAlgorithm = DigestAlgorithm.forName(req.body.digestAlgo),
+      encryptionAlgorithm = Try(EncryptionAlgorithm.forName(req.body.encryptionAlgo)).getOrElse(EncryptionAlgorithm.RSA)
+    ) match {
       case Failure(ex) => throw ex
       case Success(dataToSign) => Ok(Json.toJson(DataToSign(dataToSign)))
     }
